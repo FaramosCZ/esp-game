@@ -86,15 +86,17 @@ class Joystick:
 
 class LEDStrip:
     def __init__(self, pin, length):
-        self.strip = neopixel.NeoPixel(Pin(pin), length)
-        self.data = [COLOR_MAP["green"] for _ in range(length)]
-        self.index = length // 2
-        self.brightness = 0.05
         self.length = length
+        self.index = length // 2
         self.pin = pin
+        self.strip = neopixel.NeoPixel(Pin(pin), length)
 
+        self.data = [COLOR_MAP["green"] for _ in range(length)]
+
+        self.brightness = 0.05
+        self.currently_present_colors = {}
+        
         self.update()
-
         self.save_strip_data()
 
     def index_change(self, value):
@@ -119,7 +121,18 @@ class LEDStrip:
             print("Unexpected error: color not identified")
         return color_name
 
+    def _maintain_list_of_colors_currently_present(self):
+        self.currently_present_colors = {}
+        for i in range(self.length):
+            color = self.get_color(i)
+            if color in self.currently_present_colors:
+                self.currently_present_colors[color] += 1
+            else:
+                self.currently_present_colors[color] = 1
+        #print(self.currently_present_colors)
+        
     def update(self):
+        self._maintain_list_of_colors_currently_present()
         for i in range(self.length):
             r, g, b = self.data[i]
             self.strip[i] = (int(r * self.brightness), int(g * self.brightness), int(b * self.brightness))
@@ -145,7 +158,7 @@ class LEDStrip:
             step = 0.004
 
             while True:
-                if index != self.index:
+                if index != self.index or [r, g, b] != self.data[self.index]:
                     self.strip[index] = (int(r * self.brightness), int(g * self.brightness), int(b * self.brightness))
                     self.strip.write()
                     break
@@ -165,12 +178,18 @@ class LEDStrip:
 #
 
 class LEDGameFunctions:
-    def __init__(self, led_strip, remaining_diffculty, color):
+    def __init__(self, led_strip, remaining_diffculty, remaining_color):
         self.led_strip = led_strip
         self.remaining_diffculty = remaining_diffculty
         self.difficulty = 1
-        
-        self.assign_function("green")
+        self.color_from = remaining_color
+
+        # Here we somehow need to select some of the currently present colors from self.led_strip.currently_present_colors
+        # The color is chosen semi-randomly from 3 most present colors (warning, the self.led_strip.currently_present_colors may have less than that)
+        #   the most prsent color has about 60% chance of being selected, the 2nd has about 25%, the 3rd 15%        
+        self.color_to = ""
+
+        self.assign_function()
 
     def execute(self):
         self.execute_function()
@@ -182,33 +201,23 @@ class LEDGameFunctions:
             j = random.randint(0, i)
             lst[i], lst[j] = lst[j], lst[i]
 
-    def assign_function(self, to_color):
+    def assign_function(self):
+        # For random selection from more functions - for future code expansion
         functions = [
-            self.change_to_red
+            self.change_to_color
         ]
         self._shuffle(functions)
 
         self.execute_function = functions[0]
 
     def change_to_color():
-        # Take a look at the 
+        # This function operates with self.led_strip.index - that's the index on which the function is being called
+        # This function change the color on an index (self.led_strip.index +- some_offset)
+        # The offset is chosen semi-randomly, offset 0 has 50% chance, offset + or - 1 has 25% chance, offset + or - 2 has half that and so on.
+        #   once offset is selected, it increases this object's difficulty.      self.difficulty += abs(offset)
+        # the LED on self.led_strip.index must have the self.color_from, or nothing happens
+        # the LED changes color to self.color_to
         pass
-
-    def change_to_green(self, index):
-        self.led_strip.set_color(index, COLOR_MAP["green"])
-
-    def change_to_red(self, index=3):
-        self.led_strip.set_color(index, COLOR_MAP["red"])
-
-    def change_left_to_current_color(self, index):
-        if index > 0:
-            self.led_strip.set_color(index - 1, self.led_strip.data[index])
-
-    def change_neighbors_to_blue(self, index):
-        if index > 0:
-            self.led_strip.set_color(index - 1, COLOR_MAP["blue"])
-        if index < self.led_strip.length - 1:
-            self.led_strip.set_color(index + 1, COLOR_MAP["blue"])
 
 # ===============================================================
 #
@@ -232,13 +241,10 @@ class Game:
                     break
 
             remaining_colors = set(COLOR_MAP.keys()) - set(self.color_functions.keys())
-            remaining_colors_iter = iter(remaining_colors)
-            try:
-                next_remaining_color = next(remaining_colors_iter)
-            except StopIteration:
-                next_remaining_color = None
-            print("DEBUG: next color:", next_remaining_color)
-            if next_remaining_color:
+            if remaining_colors:
+                next_remaining_color = list(remaining_colors)[0]
+                print("DEBUG: next color:", next_remaining_color)
+
                 new_function = LEDGameFunctions(self.led_strip, remaining_diffculty, next_remaining_color)
                 # ...
                 # ...
