@@ -247,7 +247,8 @@ class Game:
 
                 new_function = LEDGameFunctions(self.led_strip, remaining_diffculty, next_remaining_color)
                 # ...
-                # ...
+                # Once new_function is chosen, it sould be applied several times IN REVERSE to set up the game boards (LEDs) but back tracking
+                #   Each such use substratcts 1 from remaining_diffculty
                 # ...
                 self.color_functions[next_remaining_color] = new_function
             else:
