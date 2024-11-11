@@ -11,15 +11,17 @@ from sys import exit
 # Constants
 #
 
+# Insertion order is important !!
+# Green must be first
 COLOR_MAP = {
-    "black":   [0,   0,   0  ],
-    "white":   [255, 255, 255],
-    "red":     [255, 0,   0  ],
     "green":   [0,   255, 0  ],
+    "red":     [255, 0,   0  ],
     "blue":    [0,   0,   255],
     "yellow":  [255, 255, 0  ],
-    "magenta": [255, 0,   255]
+    "magenta": [255, 0,   255],
+    "white":   [255, 255, 255]
 }
+#    "black":   [0,   0,   0  ],
 
 # ===============================================================
 #
@@ -44,14 +46,14 @@ class Joystick:
 
     def read(self):
         return self.x.read(), self.y.read(), self.sw.value()
-    
+
     def update(self):
         x, y, sw = self.read()
 
         # TO-DO: here I can optionally block pressing X and Y at the same time
 
         if 100 < x < 4000:
-            result_x = self.last_x = 0        
+            result_x = self.last_x = 0
         elif x < 100 and self.last_x != -1:
             result_x = self.last_x = -1
         elif x > 4000 and self.last_x != 1:
@@ -60,7 +62,7 @@ class Joystick:
             result_x = 0
 
         if 1000 < y < 3000:
-            result_y = self.last_y = 0        
+            result_y = self.last_y = 0
         elif y < 1000 and self.last_y != -1:
             result_y = self.last_y = -1
         elif y > 3000 and self.last_y != 1:
@@ -90,9 +92,11 @@ class LEDStrip:
         self.brightness = 0.05
         self.length = length
         self.pin = pin
-        
+
         self.update()
-        
+
+        self.save_strip_data()
+
     def index_change(self, value):
         self.index += value
         if self.index < 0 :
@@ -120,6 +124,13 @@ class LEDStrip:
             r, g, b = self.data[i]
             self.strip[i] = (int(r * self.brightness), int(g * self.brightness), int(b * self.brightness))
         self.strip.write()
+
+    def save_strip_data(self):
+        self.saved_strip_data = list(self.data)
+
+    def load_strip_data(self):
+        self.data = self.saved_strip_data
+        self.update()
 
     def breathe(self):
         # THREAD: breathing light on LED strip index currently selected by the user
@@ -154,9 +165,11 @@ class LEDStrip:
 #
 
 class LEDGameFunctions:
-    def __init__(self, led_strip):
+    def __init__(self, led_strip, remaining_diffculty, color):
         self.led_strip = led_strip
-        
+        self.remaining_diffculty = remaining_diffculty
+        self.difficulty = 1
+
     def execute():
         self.execute_function()
         pass
@@ -166,7 +179,7 @@ class LEDGameFunctions:
         for i in range(len(lst) - 1, 0, -1):
             j = random.randint(0, i)
             lst[i], lst[j] = lst[j], lst[i]
-        
+
     def assign_function(self, to_color):
         functions = [
             self.change_to_color
@@ -174,10 +187,11 @@ class LEDGameFunctions:
         self._shuffle(functions)
 
         self.execute_function = functions[0]
-    
+
     def change_to_color():
+        # Take a look at the 
         pass
-    
+
     def change_to_green(self, index):
         self.led_strip.set_color(index, COLOR_MAP["green"])
 
@@ -204,19 +218,47 @@ class Game:
         self.joystick = joystick
         self.led_strip = led_strip
         self.difficulty = difficulty
-        
+
         self.game_setup()
 
     def game_setup(self):
         self.color_functions = {}
-        pass
+
+        while True:
+            remaining_diffculty = self.difficulty - sum(obj.difficulty for obj in self.color_functions.values())
+            if remaining_diffculty <= 0:
+                    break
+
+            remaining_colors = set(COLOR_MAP.keys()) - set(self.color_functions.keys())
+            remaining_colors_iter = iter(remaining_colors)
+            try:
+                next_remaining_color = next(remaining_colors_iter)
+            except StopIteration:
+                next_remaining_color = None
+            print("DEBUG: next color:", next_remaining_color)
+            if next_remaining_color:
+                new_function = LEDGameFunctions(self.led_strip, remaining_diffculty, next_remaining_color)
+                # ...
+                # ...
+                # ...
+                self.color_functions[next_remaining_color] = new_function
+            else:
+                # We are out of colors to assign functions to to increase diffculty
+                # The only thing we can do now is to use the existing functions
+                # and apply them in reverse on and on, until the set is shuffled enough
+                # ...
+                # ...
+                # ...
+                # And if it's impossible, break.
+                pass
 
     def execute(self):
         self.color_functions[self.led_strip.get_color(self.led_strip.index)].execute()
         self.check_victory()
 
     def check_victory(self):
-        if all(color in [COLOR_MAP["green"], COLOR_MAP["black"]] for color in self.led_strip.data):
+        #if all(color in [COLOR_MAP["green"], COLOR_MAP["black"]] for color in self.led_strip.data):
+        if all(color in [COLOR_MAP["green"]] for color in self.led_strip.data):
             print("Victory!")
             exit()
             # TO-DO: while True to for infinity once the game is finished ?
@@ -230,12 +272,12 @@ class Game:
             x, y, sw = self.joystick.update()
 
             self.led_strip.index_change(y)
-            
+
             if x != 0:
                 self.execute()
 
             if sw != 1:
-                self.execute()
+                self.led_strip.load_strip_data()
 
 # ===============================================================
 #
