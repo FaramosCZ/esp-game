@@ -129,7 +129,7 @@ class LEDStrip:
         self.saved_strip_data = list(self.data)
 
     def load_strip_data(self):
-        self.data = self.saved_strip_data
+        self.data = list(self.saved_strip_data)
         self.update()
 
     def breathe(self):
@@ -169,8 +169,10 @@ class LEDGameFunctions:
         self.led_strip = led_strip
         self.remaining_diffculty = remaining_diffculty
         self.difficulty = 1
+        
+        self.assign_function("green")
 
-    def execute():
+    def execute(self):
         self.execute_function()
         pass
 
@@ -182,7 +184,7 @@ class LEDGameFunctions:
 
     def assign_function(self, to_color):
         functions = [
-            self.change_to_color
+            self.change_to_red
         ]
         self._shuffle(functions)
 
@@ -195,7 +197,7 @@ class LEDGameFunctions:
     def change_to_green(self, index):
         self.led_strip.set_color(index, COLOR_MAP["green"])
 
-    def change_to_red(self, index):
+    def change_to_red(self, index=3):
         self.led_strip.set_color(index, COLOR_MAP["red"])
 
     def change_left_to_current_color(self, index):
@@ -290,4 +292,5 @@ led_strip = LEDStrip(pin=0, length=10)
 game = Game(joystick, led_strip, difficulty=5)
 
 game.user_input_handler()
+
 
